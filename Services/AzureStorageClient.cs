@@ -6,6 +6,7 @@ public interface IAzureStorageClient
     string Test();
     UserEntity AddUser(string userId, string userName);
     Dictionary<string, string> MatchGroup();
+    void AddNewTimeSlot();
 }
 
 public class UserEntity : ITableEntity
@@ -44,19 +45,44 @@ public class AzureStorageClient : IAzureStorageClient
     public UserEntity AddUser(string userId, string userName)
     {
         TableClient timeSlotTableClient = new TableClient(new Uri("http://127.0.0.1:10002/devstoreaccount1"), "TimeSlots", new TableSharedKeyCredential("devstoreaccount1", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="));
-        TimeSlotEntity slot = timeSlotTableClient.Query<TimeSlotEntity>(ent => ent.TimeSlot == "Now").First();
-        Console.WriteLine(slot);
-        string currentTimeSlot = slot.TimeSlot;
-        UserEntity user = new UserEntity() { PartitionKey = currentTimeSlot, RowKey = userId, UserId = userId, UserName = userName };
-        this.asClient.AddEntity(user);
-        return user;
+        Pageable<TimeSlotEntity> entities = timeSlotTableClient.Query<TimeSlotEntity>(ent => true);
+        if (entities != null && entities.Count() > 0)
+        {
+            TimeSlotEntity currentTimeSlot = entities.MaxBy(slot => slot.TimeSlot);
+            if (currentTimeSlot != null)
+            {
+                UserEntity user = new UserEntity() { PartitionKey = currentTimeSlot.TimeSlot, RowKey = userId, UserId = userId, UserName = userName };
+                this.asClient.AddEntity(user);
+                return user;
+            }
+
+        }
+        throw new Exception("No TimeSlot Found");
+    }
+
+    public void AddNewTimeSlot()
+    {
+        TableClient timeSlotTableClient = new TableClient(new Uri("http://127.0.0.1:10002/devstoreaccount1"), "TimeSlots", new TableSharedKeyCredential("devstoreaccount1", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="));
+        Pageable<TimeSlotEntity> slot = timeSlotTableClient.Query<TimeSlotEntity>(ent => true);
+        int newTimeSlot = 0;
+        if (slot.Count() > 0)
+        {
+            newTimeSlot = Int32.Parse(slot.First().TimeSlot) + 1;
+        }
+        timeSlotTableClient.AddEntity<TimeSlotEntity>(new TimeSlotEntity()
+        {
+            PartitionKey = "timeslot",
+            RowKey = newTimeSlot.ToString(),
+            TimeSlot = newTimeSlot.ToString()
+        });
     }
 
     public Dictionary<string, string> MatchGroup()
     {
         TableClient timeSlotTableClient = new TableClient(new Uri("http://127.0.0.1:10002/devstoreaccount1"), "TimeSlots", new TableSharedKeyCredential("devstoreaccount1", "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="));
-        TimeSlotEntity slot = timeSlotTableClient.Query<TimeSlotEntity>(ent => ent.TimeSlot == "today").First();
-        string currentTimeSlot = slot.TimeSlot;
+        Pageable<TimeSlotEntity> slot = timeSlotTableClient.Query<TimeSlotEntity>(ent => true);
+
+        string currentTimeSlot = slot.MaxBy(slot => Int32.Parse(slot.TimeSlot)).TimeSlot;
         List<UserEntity> entities = this.asClient.Query<UserEntity>(user => user.PartitionKey == currentTimeSlot).ToList();
 
         Dictionary<string, string> matchDict = new Dictionary<string, string>();
@@ -70,7 +96,7 @@ public class AzureStorageClient : IAzureStorageClient
 
         entities = entities.OrderBy(x => Random.Shared.Next()).ToList();
         int point = 0;
-        while (point <= (entities.Count() / 2))
+        while (point <= (entities.Count() / 2) && entities.Count() > 0)
         {
             matchDict.Add(entities[point].UserName, entities[entities.Count() - point - 1].UserName);
             point += 1;

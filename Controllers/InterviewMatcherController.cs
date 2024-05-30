@@ -27,9 +27,9 @@ public class InterviewMatcherController : ControllerBase
         return client.MatchGroup();
     }
 
-    [HttpPost("DummyTest")]
-    public string DummyTest([FromKeyedServices("AzureStorageClient")] IAzureStorageClient client)
+    [HttpPost("CreateTimeSlot")]
+    public void CreateTimeSlot([FromKeyedServices("AzureStorageClient")] IAzureStorageClient client)
     {
-        return client.Test();
+        client.AddNewTimeSlot();
     }
 }

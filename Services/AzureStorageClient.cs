@@ -72,7 +72,6 @@ public class AzureStorageClient : IAzureStorageClient
         int point = 0;
         while (point <= (entities.Count() / 2))
         {
-            Console.WriteLine(point);
             matchDict.Add(entities[point].UserName, entities[entities.Count() - point - 1].UserName);
             point += 1;
         }
